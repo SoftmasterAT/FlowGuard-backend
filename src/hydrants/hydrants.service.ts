@@ -24,16 +24,31 @@ export class HydrantsService {
         return this.hydrantRepo.find();
     }
 
-    /**
-     * Sucht einen spezifischen Hydranten anhand seiner eindeutigen ID.
-     * Gibt das gefundene Hydranten-Objekt zurück oder null, falls kein 
-     * Datensatz mit dieser ID existiert.
+     /**
+     * Sucht einen spezifischen Hydranten anhand seiner ID inklusive der zugehörigen Messhistorie.
+     * Lädt die verknüpften Druck-Logs (One-to-Many) automatisch mit, sortiert diese 
+     * chronologisch absteigend und limitiert das Ergebnis auf die neuesten 20 Einträge.
+     * Dies stellt sicher, dass Diagramme im Frontend (z.B. Highcharts) sofort nach einem 
+     * Update oder einer Einzelabfrage mit aktuellen Daten versorgt werden.
      * 
      * @param {number} id - Die eindeutige ID des gesuchten Hydranten.
-     * @returns {Promise<Hydrant | null>} Ein Promise, das den Hydranten oder null liefert.
+     * @returns {Promise<Hydrant | null>} Ein Promise, das den Hydranten inklusive limitierter Logs 
+     * oder null liefert, falls kein Datensatz existiert.
      */
     async findOne(id: number): Promise<Hydrant | null> {
-        return this.hydrantRepo.findOneBy({ id });
+        return this.hydrantRepo.findOne({
+            where: { id },
+            relations: { logs: true }, // Lädt die verknüpften Logs aus der Datenbank
+            order: { 
+                logs: { timestamp: 'DESC' } // Neueste Messwerte zuerst
+            }
+        }).then(hydrant => {
+            if (hydrant && hydrant.logs) {
+                // Begrenzung im Speicher, um das Antwortvolumen (JSON) klein zu halten
+                hydrant.logs = hydrant.logs.slice(0, 20);
+            }
+            return hydrant;
+        });
     }
 
 
@@ -147,9 +162,10 @@ export class HydrantsService {
      * @returns {Promise<Hydrant>} Ein Promise, das den vollständig erstellten Hydranten zurückgibt.
      */
     async create(data: Partial<Hydrant>): Promise<Hydrant> {
+        const { logs, ...cleanData } = data;
         const hydrant = this.hydrantRepo.create({
-            ...data,
-            currentPressure: data.basePressure || 4.0,
+            ...cleanData,
+            currentPressure: cleanData.basePressure || 4.0,
             status: 'OK'
         });
         return this.hydrantRepo.save(hydrant);
@@ -164,19 +180,20 @@ export class HydrantsService {
      * @param {Partial<Hydrant>} data - Die geänderten Attribute des Hydranten.
      * @returns {Promise<Hydrant | null>} Ein Promise mit dem aktualisierten Hydranten oder null.
      */
-    async update(id: number, data: Partial<Hydrant>): Promise<Hydrant | null> {
-        await this.hydrantRepo.update(id, data);
+    async update(id: number, updateData: any) {
+        const { logs, ...cleanData } = updateData; 
+        
+        await this.hydrantRepo.update(id, cleanData);
         return this.findOne(id);
     }
 
     /**
-     * Entfernt einen Hydranten und alle damit verknüpften Daten aus der Datenbank.
-     * Um die referenzielle Integrität (Foreign Key Constraints) zu wahren, 
-     * werden zuerst alle zugehörigen Druckmesswerte (Logs) gelöscht, 
-     * bevor der Hydrant-Datensatz selbst entfernt wird.
+     * Entfernt einen Hydranten und alle zugehörigen Messwerte unwiderruflich.
+     * Löscht zuerst alle verknüpften PressureLogs, um Foreign-Key-Beschränkungen 
+     * in der Datenbank zu erfüllen, und anschließend den Hydranten-Stammdatensatz.
      * 
-     * @param {number} id - Die eindeutige ID des zu löschenden Hydranten.
-     * @returns {Promise<void>}
+     * @param {number} id - Die ID des zu löschenden Hydranten.
+     * @returns {Promise<void>} Ein Promise, das nach erfolgreichem Löschvorgang aufgelöst wird.
      */
     async remove(id: number): Promise<void> {
         // Zuerst die Logs löschen (wegen Foreign Key Constraints)
