@@ -1,4 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { PressureLog } from './pressure-log.entity';
 
 /**
  * Datenbank-Entität, die einen Wasserhydranten im Stadtnetz repräsentiert.
@@ -34,4 +35,7 @@ export class Hydrant {
     /** @type {number} Derzeit gemessener Wasserdruck in Bar */
     @Column('float', { default: 4 })
     currentPressure: number;
+
+    @OneToMany(() => PressureLog, (log) => log.hydrant)
+    logs: PressureLog[];
 }

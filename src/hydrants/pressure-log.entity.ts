@@ -12,9 +12,9 @@ export class PressureLog {
     @Column('float')
     value: number; // Der Druck in Bar (z.B. 4.52)
 
-    @CreateDateColumn()
+    @CreateDateColumn({ type: 'timestamptz' })
     timestamp: Date; // Wann wurde gemessen?
 
-    @ManyToOne(() => Hydrant)
+    @ManyToOne(() => Hydrant, (hydrant) => hydrant.logs)
     hydrant: Hydrant; // Zu welchem Hydranten gehört der Wert?
 }

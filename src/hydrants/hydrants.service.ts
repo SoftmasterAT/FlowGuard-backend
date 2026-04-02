@@ -62,23 +62,30 @@ export class HydrantsService {
      * @returns {Promise<any[]>} Ein Promise mit der Liste der Hydranten inklusive `currentPressure`.
      */
     async findAllWithLivePressure(): Promise<any[]> {
+    // Wir holen alle Hydranten UND die zugehörigen Logs in EINEM Query
         const hydrants = await this.hydrantRepo.find({
-            order: { id: 'ASC' } // Grund-Sortierung direkt von der DB
+            relations: {
+                logs: true
+            },
+            order: {
+                name: 'ASC', // Sortierung nach Name (alphabetisch)
+                logs: {
+                    timestamp: 'DESC' // Neueste Logs innerhalb des Hydranten zuerst
+                }
+            }
         });
 
-        // Für jeden Hydranten den neuesten Log-Eintrag suchen
-        const liveData = await Promise.all(hydrants.map(async (h) => {
-            const lastLog = await this.logRepo.findOne({
-                where: { hydrant: { id: h.id } },
-                order: { timestamp: 'DESC' },
-            });
+        // Wir limitieren die Logs im Speicher auf die letzten 20, 
+        // damit das JSON-Objekt für das Frontend nicht zu groß wird.
+        return hydrants.map(h => {
+            const limitedLogs = h.logs ? h.logs.slice(0, 20) : [];
             return {
                 ...h,
-                currentPressure: lastLog ? lastLog.value : h.basePressure
+                // Der aktuelle Druck ist der Wert des neuesten Logs (da DESC sortiert)
+                currentPressure: limitedLogs.length > 0 ? limitedLogs[0].value : h.basePressure,
+                logs: limitedLogs
             };
-        }));
-
-        return liveData.sort((a, b) => a.id - b.id);
+        });
     }
 
     /**
