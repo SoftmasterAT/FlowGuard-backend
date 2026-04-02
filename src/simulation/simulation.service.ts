@@ -36,7 +36,7 @@ export class SimulationService implements OnApplicationBootstrap {
     async onApplicationBootstrap() {
         console.log('🌊 Wasser-Simulation gestartet...');
         // 1. Simulation jede Sekunde
-        setInterval(() => this.generateData(), 1000); 
+        setInterval(() => this.generateData(), 10000); 
 
         // 2. Cleanup alle 10 Minuten: Lösche alles, was älter als 24h ist
         setInterval(() => this.cleanupDatabase(), 10 * 60 * 1000);
