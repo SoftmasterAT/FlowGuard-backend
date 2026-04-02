@@ -70,36 +70,16 @@ export class HydrantsService {
     }
 
     /**
-     * Ruft alle Hydranten ab und reichert sie mit dem aktuellsten Druckwert aus den Logs an.
-     * Durchläuft die Hydranten-Liste und sucht für jeden Eintrag den neuesten Log-Zeitstempel.
-     * Falls kein Log vorhanden ist, wird der definierte Basisdruck als Rückfallwert verwendet.
+     * Ruft die Liste aller Hydranten für die Übersicht ab (Karte/Sidebar).
+     * Um die Netzwerklast zu minimieren, werden hier nur die Stammdaten und der 
+     * aktuelle Druckwert ohne die historische Messhistorie (Logs) geladen.
+     * Die Sortierung erfolgt alphabetisch nach dem Namen.
      * 
-     * @returns {Promise<any[]>} Ein Promise mit der Liste der Hydranten inklusive `currentPressure`.
+     * @returns {Promise<Hydrant[]>} Liste der Hydranten für die performante Initialanzeige.
      */
-    async findAllWithLivePressure(): Promise<any[]> {
-    // Wir holen alle Hydranten UND die zugehörigen Logs in EINEM Query
-        const hydrants = await this.hydrantRepo.find({
-            relations: {
-                logs: true
-            },
-            order: {
-                name: 'ASC', // Sortierung nach Name (alphabetisch)
-                logs: {
-                    timestamp: 'DESC' // Neueste Logs innerhalb des Hydranten zuerst
-                }
-            }
-        });
-
-        // Wir limitieren die Logs im Speicher auf die letzten 20, 
-        // damit das JSON-Objekt für das Frontend nicht zu groß wird.
-        return hydrants.map(h => {
-            const limitedLogs = h.logs ? h.logs.slice(0, 20) : [];
-            return {
-                ...h,
-                // Der aktuelle Druck ist der Wert des neuesten Logs (da DESC sortiert)
-                currentPressure: limitedLogs.length > 0 ? limitedLogs[0].value : h.basePressure,
-                logs: limitedLogs
-            };
+    async findAllWithLivePressure(): Promise<Hydrant[]> {
+        return this.hydrantRepo.find({
+            order: { name: 'ASC' }
         });
     }
 
